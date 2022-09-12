@@ -1,0 +1,156 @@
+---
+title: "STAT340$PROJ"
+output: html_document
+---
+```{r}
+
+```
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(modelr)
+library(quantmod)
+library(jtools)
+```
+
+$$Description$$
+
+Group members:
+
+***Kashin Shah, Girik Soni, Ali Manzoor, Petray Wu***
+
+- https://www.sourceallies.com/2020/02/tesla-stock-volatility-in-r/
+```{r}
+read.csv('CEA.csv',header=TRUE)->CEA
+read.csv('JBLU.csv',sep=',',header=TRUE)->JBLU
+read.csv('LUV.csv',sep=',',header=TRUE)->LUV
+read.csv('RYAAY.csv',sep=',',header=TRUE)->RYAAY
+read.csv('SKYW.csv',sep=',',header=TRUE)->SKYW
+read.csv('ZNH.csv',sep=',',header=TRUE)->ZNH
+#read the data bundle
+
+
+CEA%>%mutate(CEA_mean_price=(Open+Close)/2)%>%select(c(Date,CEA_mean_price))->CEA
+JBLU%>%mutate(JBLU_mean_price=(Open+Close)/2)%>%select(c(Date,JBLU_mean_price))->JBLU
+LUV%>%mutate(LUV_mean_price=(Open+Close)/2)%>%select(c(Date,LUV_mean_price))->LUV
+RYAAY%>%mutate(RYAAY_mean_price=(Open+Close)/2)%>%select(c(Date,RYAAY_mean_price))->RYAAY
+SKYW%>%mutate(SKYW_mean_price=(Open+Close)/2)%>%select(c(Date,SKYW_mean_price))->SKYW
+ZNH%>%mutate(ZNH_mean_price=(Open+Close)/2)%>%select(c(Date,ZNH_mean_price))->ZNH
+#get the mean price per data for each stock
+ticker <- "SPY"
+stock <- getSymbols(ticker,auto.assign = FALSE,from = "2002-04-15", to = "2020-04-15")
+tmp <- getQuote(ticker)
+stock <- rbind(stock, xts(cbind(tmp$Open,tmp$High,tmp$Low,tmp$Last,tmp$Volume,tmp$Last), order.by = Sys.Date()))
+as.data.frame(stock)%>%
+  rownames_to_column(var = "Date")%>%
+  mutate(SPY_mean_price=(SPY.Open+SPY.Close)/2)%>%
+  select(Date, SPY_mean_price)->SPY
+merge(CEA,JBLU, by = "Date")->a
+merge(a, LUV,by = "Date")->b
+merge(b, RYAAY,by = "Date")->c
+merge(c, SKYW,by = "Date")->d
+merge(d, ZNH,by = "Date")->e
+merge(e,SPY,by="Date")->flight_data
+
+
+rand = flight_data
+
+
+for (col in names(flight_data)[-1]) {
+  symbol <- str_sub(col, 1, -9)
+  new_col_name <- paste(symbol, "% Change")
+  col_values <- flight_data[[col]]
+  flight_data[[new_col_name]] <- 100*(col_values - lag(col_values))/lag(col_values)
+}
+
+flight_data <- flight_data[-1, ]
+
+flight_data <- select(flight_data, Date, `CEA_me % Change`:`SPY_me % Change`)
+names(flight_data)[-1] <- str_sub(names(flight_data)[-1], 1, -13)
+
+flight_data <- flight_data %>%
+pivot_longer(names_to = "Airlines", 
+               values_to = "Change", 
+               cols = CEA:ZNH)%>%
+  select(Date,Airlines,Change_in_stock=Change,Change_in_market=SPY)
+```
+
+```{r}
+flight_data
+```
+
+```{r}
+
+# 2020-01-03 to 2020-04-01
+COVID = flight_data %>%
+  mutate(Date1 = ymd(Date)) %>%
+  select(Date1, Airlines, Change_in_stock,Change_in_market) %>%
+  filter(Date1 >= as.Date("2020-01-03"))
+
+SARS = flight_data %>%
+  mutate(Date1 = ymd(Date)) %>%
+  select(Date1, Airlines, Change_in_stock,Change_in_market) %>%
+  filter(Date1 >= as.Date("2002-11-16") & Date1 <= as.Date("2003-02-09"))
+
+ggplot(data = COVID, group = 1) +
+  geom_line(aes(x = ymd(Date1), y = Change_in_stock)) +
+  facet_wrap("Airlines", nrow  = 2) +
+  scale_x_date(date_labels = "%b")
+
+
+ggplot(data = SARS, group = 1) +
+  geom_line(aes(x = ymd(Date1), y = Change_in_stock)) +
+  facet_wrap("Airlines", nrow  = 2) +
+  scale_x_date(date_labels = "%b")
+
+```
+
+```{r}
+SARS %>% 
+  group_by(Airlines) %>% 
+  summarize(`Standard Deviation of % Change` = sd(`Change_in_stock`)) %>% 
+  arrange(desc(`Standard Deviation of % Change`))
+
+COVID %>% 
+  group_by(Airlines) %>% 
+  summarize(`Standard Deviation of % Change` = sd(`Change_in_stock`)) %>% 
+  arrange(desc(`Standard Deviation of % Change`))
+
+
+
+```
+
+
+
+
+```{r}
+fit <- lm(SARS$Change_in_stock ~ SARS$Change_in_market)
+result <- summary(fit)
+summ(fit)
+
+```
+```{r}
+fit <- lm(COVID$Change_in_stock ~ COVID$Change_in_market)
+result <- summary(fit)
+
+summ(fit)
+
+```
+
+```{r}
+Beta_COV = cov(COVID$Change_in_stock, COVID$Change_in_market)/var(COVID$Change_in_market)
+Beta_COV
+
+Beta_SARS = cov(SARS$Change_in_stock, SARS$Change_in_market)/var(SARS$Change_in_market)
+Beta_SARS
+```
+
+
+
+
+
+
+
+
+
