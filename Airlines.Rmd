@@ -18,7 +18,6 @@ $$Description$$
 
 Group members:
 
-***Kashin Shah, Girik Soni, Ali Manzoor, Petray Wu***
 
 - https://www.sourceallies.com/2020/02/tesla-stock-volatility-in-r/
 ```{r}
